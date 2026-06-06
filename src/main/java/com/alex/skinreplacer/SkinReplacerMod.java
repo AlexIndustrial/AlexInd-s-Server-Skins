@@ -15,8 +15,8 @@ import net.minecraft.util.ResourceLocation;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
@@ -117,23 +117,20 @@ public class SkinReplacerMod {
                     return;
                 }
 
-                File cacheDir = new File(Minecraft.getMinecraft().mcDataDir, "config/skinreplacer");
-                cacheDir.mkdirs();
-                File cacheFile = new File(cacheDir, playerName + ".png");
-
-                try (InputStream in = pngConn.getInputStream();
-                     FileOutputStream out = new FileOutputStream(cacheFile)) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                try (InputStream in = pngConn.getInputStream()) {
                     byte[] buf = new byte[8192];
                     int read;
-                    while ((read = in.read(buf)) != -1) out.write(buf, 0, read);
+                    while ((read = in.read(buf)) != -1) baos.write(buf, 0, read);
                 } finally {
                     pngConn.disconnect();
                 }
 
-                System.out.println(">>>>> Downloaded skin PNG to: " + cacheFile.getAbsolutePath());
+                byte[] pngBytes = baos.toByteArray();
+                System.out.println(">>>>> Downloaded skin PNG for " + playerName + ": " + pngBytes.length + " bytes");
 
-                // Step 4: Read and process
-                BufferedImage img = ImageIO.read(cacheFile);
+                // Step 4: Process
+                BufferedImage img = ImageIO.read(new ByteArrayInputStream(pngBytes));
                 if (img == null) {
                     System.out.println(">>>>> Failed to read skin image for " + playerName);
                     return;

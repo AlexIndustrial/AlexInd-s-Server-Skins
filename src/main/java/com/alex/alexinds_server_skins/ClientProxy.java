@@ -1,4 +1,4 @@
-package com.alex.skinreplacer;
+package com.alex.alexinds_server_skins;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -156,7 +156,7 @@ public class ClientProxy extends CommonProxy {
                             Math.min(pixels.length, dynTex.getTextureData().length));
                         dynTex.updateDynamicTexture();
 
-                        ResourceLocation loc = new ResourceLocation("skinreplacer", "skins/" + name);
+                        ResourceLocation loc = new ResourceLocation("alexinds_server_skins", "skins/" + name);
                         mc.getTextureManager().loadTexture(loc, dynTex);
                         readySkins.put(name, loc);
                         System.out.println(">>>>> Skin texture ready: " + name + " -> " + loc);

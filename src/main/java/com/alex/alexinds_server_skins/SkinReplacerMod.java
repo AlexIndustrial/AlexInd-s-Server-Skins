@@ -1,4 +1,4 @@
-package com.alex.skinreplacer;
+package com.alex.alexinds_server_skins;
 
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.SidedProxy;
@@ -6,12 +6,12 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.minecraftforge.common.config.Configuration;
 
-@Mod(modid = "skinreplacer", name = "AlexInd's Server Skins", version = "1.0.0", acceptableRemoteVersions = "*")
+@Mod(modid = "alexinds_server_skins", name = "AlexInd's Server Skins", version = "1.0.0", acceptableRemoteVersions = "*")
 public class SkinReplacerMod {
 
     @SidedProxy(
-        clientSide = "com.alex.skinreplacer.ClientProxy",
-        serverSide = "com.alex.skinreplacer.ServerProxy"
+        clientSide = "com.alex.alexinds_server_skins.ClientProxy",
+        serverSide = "com.alex.alexinds_server_skins.ServerProxy"
     )
     public static CommonProxy proxy;
 

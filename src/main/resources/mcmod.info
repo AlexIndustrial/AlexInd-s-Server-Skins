@@ -1,6 +1,6 @@
 [
 {
-  "modid": "skinreplacer",
+  "modid": "alexinds_server_skins",
   "name": "AlexInd's Server Skins",
   "description": "Replaces player skins with per-player skins from API",
   "version": "${version}",

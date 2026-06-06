@@ -1,3 +1,5 @@
+[Read this in Russian](README.ru.md)
+
 # AlexInd's Server Skins
 
 A client-side Minecraft 1.7.10 Forge mod that replaces player skins with per-player skins fetched from an API.

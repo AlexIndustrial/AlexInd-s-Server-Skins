@@ -15,7 +15,7 @@ public class SkinReplacerMod {
     )
     public static CommonProxy proxy;
 
-    private static String apiUrlTemplate = "https://node1.desert-chat.ru/api/minecraft/textures/%s";
+    private static String apiUrlTemplate = "http://localhost:8000/%s";
 
     static String getApiUrlTemplate() {
         return apiUrlTemplate;
@@ -26,7 +26,7 @@ public class SkinReplacerMod {
         Configuration config = new Configuration(event.getSuggestedConfigurationFile());
         config.load();
         apiUrlTemplate = config.getString("apiUrl", "general",
-            "https://node1.desert-chat.ru/api/minecraft/textures/%s",
+            "http://localhost:8000/%s",
             "URL template for skin API. Use %s as the nickname placeholder.");
         config.save();
         System.out.println(">>>>> AlexInd's Server Skins initialized, apiUrl=" + apiUrlTemplate);

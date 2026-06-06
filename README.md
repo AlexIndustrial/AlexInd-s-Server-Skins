@@ -14,7 +14,7 @@ After first launch, edit `config/alexinds_server_skins.cfg`:
 
 ```
 general {
-    S:apiUrl=https://node1.desert-chat.ru/api/minecraft/textures/%s
+    S:apiUrl=http://localhost:8000/%s
 }
 ```
 

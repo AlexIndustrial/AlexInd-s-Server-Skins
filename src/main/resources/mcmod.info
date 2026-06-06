@@ -1,0 +1,15 @@
+[
+{
+  "modid": "skinreplacer",
+  "name": "Skin Replacer",
+  "description": "Replaces all player skins with a custom skin from URL",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "authorList": ["Alex"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]

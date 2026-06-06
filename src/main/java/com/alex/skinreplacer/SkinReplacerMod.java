@@ -1,5 +1,7 @@
 package com.alex.skinreplacer;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
@@ -12,28 +14,33 @@ import net.minecraft.util.ResourceLocation;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Mod(modid = "skinreplacer", name = "Skin Replacer", version = "1.0.0", acceptableRemoteVersions = "*")
 public class SkinReplacerMod {
 
-    private static Field locationSkinField;
-    private static ResourceLocation customSkinLocation;
-    private static boolean skinReady = false;
+    private static final String API_URL = "https://node1.desert-chat.ru/api/minecraft/textures/%s";
 
-    // Downloaded image stored here, loaded on main thread
-    private static final AtomicReference<BufferedImage> pendingImage = new AtomicReference<>(null);
+    private static Field locationSkinField;
+    private static final ConcurrentHashMap<String, BufferedImage> pendingTextures = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, ResourceLocation> readySkins = new ConcurrentHashMap<>();
+    private static final Set<String> downloading = new HashSet<>();
+    private static final Gson gson = new Gson();
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         findField();
-        downloadSkin("https://node1.desert-chat.ru/api/static/skins/1.png");
+        System.out.println(">>>>> SkinReplacer initialized");
     }
 
     private static void findField() {
@@ -52,111 +59,152 @@ public class SkinReplacerMod {
         }
     }
 
-    private static void downloadSkin(String skinUrl) {
-        new Thread(() -> {
-            try {
-                System.out.println(">>>>> Downloading skin from: " + skinUrl);
-                URL url = new URL(skinUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestProperty("User-Agent", "SkinReplacer/1.0");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
-                conn.connect();
-
-                System.out.println(">>>>> HTTP response: " + conn.getResponseCode());
-                if (conn.getResponseCode() != 200) {
-                    System.out.println(">>>>> HTTP error: " + conn.getResponseCode());
-                    return;
-                }
-
-                File cacheDir = new File(Minecraft.getMinecraft().mcDataDir, "config/skinreplacer");
-                cacheDir.mkdirs();
-                File cacheFile = new File(cacheDir, "skin.png");
-
-                try (InputStream in = conn.getInputStream();
-                     FileOutputStream out = new FileOutputStream(cacheFile)) {
-                    byte[] buf = new byte[8192];
-                    int read;
-                    while ((read = in.read(buf)) != -1) out.write(buf, 0, read);
-                } finally {
-                    conn.disconnect();
-                }
-
-                System.out.println(">>>>> Downloaded to: " + cacheFile.getAbsolutePath());
-
-                BufferedImage img = ImageIO.read(cacheFile);
-                if (img == null) {
-                    System.out.println(">>>>> Failed to read image");
-                    return;
-                }
-
-                System.out.println(">>>>> Image loaded: " + img.getWidth() + "x" + img.getHeight());
-
-                // Convert to 1.7.10 format using vanilla skin parser
-                System.out.println(">>>>> Converting to 64x32...");
-                img = new net.minecraft.client.renderer.ImageBufferDownload().parseUserSkin(img);
-
-                pendingImage.set(img);
-            } catch (Exception e) {
-                System.out.println(">>>>> Download FAILED!");
-                e.printStackTrace();
-            }
-        }, "SkinDownloader").start();
-    }
-
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         System.out.println(">>>>> Registering tick handler");
         cpw.mods.fml.common.FMLCommonHandler.instance().bus().register(new SkinTicker());
     }
 
+    private static void fetchSkin(String playerName) {
+        synchronized (downloading) {
+            if (downloading.contains(playerName)) return;
+            downloading.add(playerName);
+        }
+
+        new Thread(() -> {
+            try {
+                String apiUrl = String.format(API_URL, playerName);
+                System.out.println(">>>>> Fetching skin info for: " + playerName + " from " + apiUrl);
+
+                // Step 1: Get JSON from API
+                URL url = new URL(apiUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestProperty("User-Agent", "SkinReplacer/1.0");
+                conn.setConnectTimeout(10000);
+                conn.setReadTimeout(10000);
+                conn.connect();
+
+                System.out.println(">>>>> API response: " + conn.getResponseCode());
+                if (conn.getResponseCode() != 200) {
+                    System.out.println(">>>>> API error for " + playerName + ": " + conn.getResponseCode());
+                    return;
+                }
+
+                StringBuilder jsonStr = new StringBuilder();
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+                    String line;
+                    while ((line = br.readLine()) != null) jsonStr.append(line);
+                } finally {
+                    conn.disconnect();
+                }
+
+                // Step 2: Parse JSON
+                JsonObject json = gson.fromJson(jsonStr.toString(), JsonObject.class);
+                String skinUrl = json.getAsJsonObject("SKIN").get("url").getAsString();
+                System.out.println(">>>>> Got skin URL for " + playerName + ": " + skinUrl);
+
+                // Step 3: Download PNG
+                System.out.println(">>>>> Downloading skin PNG for: " + playerName);
+                URL skinPngUrl = new URL(skinUrl);
+                HttpURLConnection pngConn = (HttpURLConnection) skinPngUrl.openConnection();
+                pngConn.setRequestProperty("User-Agent", "SkinReplacer/1.0");
+                pngConn.setConnectTimeout(10000);
+                pngConn.setReadTimeout(10000);
+                pngConn.connect();
+
+                if (pngConn.getResponseCode() != 200) {
+                    System.out.println(">>>>> PNG error for " + playerName + ": " + pngConn.getResponseCode());
+                    return;
+                }
+
+                File cacheDir = new File(Minecraft.getMinecraft().mcDataDir, "config/skinreplacer");
+                cacheDir.mkdirs();
+                File cacheFile = new File(cacheDir, playerName + ".png");
+
+                try (InputStream in = pngConn.getInputStream();
+                     FileOutputStream out = new FileOutputStream(cacheFile)) {
+                    byte[] buf = new byte[8192];
+                    int read;
+                    while ((read = in.read(buf)) != -1) out.write(buf, 0, read);
+                } finally {
+                    pngConn.disconnect();
+                }
+
+                System.out.println(">>>>> Downloaded skin PNG to: " + cacheFile.getAbsolutePath());
+
+                // Step 4: Read and process
+                BufferedImage img = ImageIO.read(cacheFile);
+                if (img == null) {
+                    System.out.println(">>>>> Failed to read skin image for " + playerName);
+                    return;
+                }
+
+                System.out.println(">>>>> Skin image for " + playerName + ": " + img.getWidth() + "x" + img.getHeight());
+
+                img = new net.minecraft.client.renderer.ImageBufferDownload().parseUserSkin(img);
+
+                pendingTextures.put(playerName, img);
+                System.out.println(">>>>> Skin ready for main thread: " + playerName);
+            } catch (Exception e) {
+                System.out.println(">>>>> Failed to fetch skin for " + playerName);
+                e.printStackTrace();
+            } finally {
+                synchronized (downloading) {
+                    downloading.remove(playerName);
+                }
+            }
+        }, "Skin-" + playerName).start();
+    }
+
     public static class SkinTicker {
-        private boolean textureUploaded = false;
 
         @SubscribeEvent
         public void onTick(TickEvent.ClientTickEvent event) {
             if (event.phase != TickEvent.Phase.END) return;
 
             Minecraft mc = Minecraft.getMinecraft();
+            if (mc.theWorld == null) return;
 
-            // Step 1: Upload texture to OpenGL on main thread
-            if (!textureUploaded) {
-                BufferedImage img = pendingImage.getAndSet(null);
+            // Process pending textures (main thread = OpenGL)
+            for (String name : pendingTextures.keySet()) {
+                BufferedImage img = pendingTextures.remove(name);
                 if (img != null) {
                     try {
-                        System.out.println(">>>>> Creating DynamicTexture on main thread...");
                         DynamicTexture dynTex = new DynamicTexture(img.getWidth(), img.getHeight());
                         int[] pixels = img.getRGB(0, 0, img.getWidth(), img.getHeight(), null, 0, img.getWidth());
                         System.arraycopy(pixels, 0, dynTex.getTextureData(), 0,
                             Math.min(pixels.length, dynTex.getTextureData().length));
                         dynTex.updateDynamicTexture();
 
-                        customSkinLocation = new ResourceLocation("skinreplacer", "skin");
-                        mc.getTextureManager().loadTexture(customSkinLocation, dynTex);
-                        skinReady = true;
-                        textureUploaded = true;
-                        System.out.println(">>>>> Skin READY! location=" + customSkinLocation);
+                        ResourceLocation loc = new ResourceLocation("skinreplacer", "skins/" + name);
+                        mc.getTextureManager().loadTexture(loc, dynTex);
+                        readySkins.put(name, loc);
+                        System.out.println(">>>>> Skin texture ready: " + name + " -> " + loc);
                     } catch (Exception e) {
-                        System.out.println(">>>>> Texture upload FAILED!");
+                        System.out.println(">>>>> Texture upload failed for " + name);
                         e.printStackTrace();
                     }
                 }
-                return; // Continue next tick
             }
 
-            // Step 2: Apply skin on main thread
-            if (!skinReady || locationSkinField == null || mc.theWorld == null) return;
+            // Apply skins + fetch missing
+            if (locationSkinField == null) return;
 
-            try {
-                for (Object obj : mc.theWorld.playerEntities) {
-                    if (obj instanceof AbstractClientPlayer) {
-                        AbstractClientPlayer p = (AbstractClientPlayer) obj;
-                        locationSkinField.set(p, customSkinLocation);
+            for (Object obj : mc.theWorld.playerEntities) {
+                if (!(obj instanceof AbstractClientPlayer)) continue;
+                AbstractClientPlayer p = (AbstractClientPlayer) obj;
+                String name = p.getCommandSenderName();
+
+                ResourceLocation skin = readySkins.get(name);
+                if (skin != null) {
+                    try {
+                        locationSkinField.set(p, skin);
+                    } catch (Exception e) {
+                        System.out.println(">>>>> Error setting skin for " + name);
                     }
+                } else if (!pendingTextures.containsKey(name)) {
+                    fetchSkin(name);
                 }
-            } catch (Exception e) {
-                System.out.println(">>>>> Apply skin error!");
-                e.printStackTrace();
             }
         }
     }

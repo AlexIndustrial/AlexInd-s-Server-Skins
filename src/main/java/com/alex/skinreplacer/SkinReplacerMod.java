@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.AbstractClientPlayer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.common.config.Configuration;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -26,10 +27,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Mod(modid = "skinreplacer", name = "Skin Replacer", version = "1.0.0", acceptableRemoteVersions = "*")
+@Mod(modid = "skinreplacer", name = "AlexInd's Server Skins", version = "1.0.0", acceptableRemoteVersions = "*")
 public class SkinReplacerMod {
 
-    private static final String API_URL = "https://node1.desert-chat.ru/api/minecraft/textures/%s";
+    private static String apiUrlTemplate = "https://node1.desert-chat.ru/api/minecraft/textures/%s";
 
     private static Field locationSkinField;
     private static final ConcurrentHashMap<String, BufferedImage> pendingTextures = new ConcurrentHashMap<>();
@@ -40,7 +41,15 @@ public class SkinReplacerMod {
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         findField();
-        System.out.println(">>>>> SkinReplacer initialized");
+
+        Configuration config = new Configuration(event.getSuggestedConfigurationFile());
+        config.load();
+        apiUrlTemplate = config.getString("apiUrl", "general",
+            "https://node1.desert-chat.ru/api/minecraft/textures/%s",
+            "URL template for skin API. Use %s as the nickname placeholder.");
+        config.save();
+
+        System.out.println(">>>>> AlexInd's Server Skins initialized, apiUrl=" + apiUrlTemplate);
     }
 
     private static void findField() {
@@ -73,7 +82,7 @@ public class SkinReplacerMod {
 
         new Thread(() -> {
             try {
-                String apiUrl = String.format(API_URL, playerName);
+                String apiUrl = String.format(apiUrlTemplate, playerName);
                 System.out.println(">>>>> Fetching skin info for: " + playerName + " from " + apiUrl);
 
                 // Step 1: Get JSON from API

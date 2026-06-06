@@ -1,8 +1,8 @@
 [
 {
   "modid": "skinreplacer",
-  "name": "Skin Replacer",
-  "description": "Replaces all player skins with a custom skin from URL",
+  "name": "AlexInd's Server Skins",
+  "description": "Replaces player skins with per-player skins from API",
   "version": "${version}",
   "mcversion": "${mcversion}",
   "url": "",

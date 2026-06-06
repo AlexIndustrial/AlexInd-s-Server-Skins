@@ -41,6 +41,24 @@ The server must return JSON with the following structure:
 
 The skin PNG must be accessible via direct GET request (no redirects, no auth).
 
+## Example server
+
+A minimal Python server is provided in `example-server/server.py`:
+
+```
+python example-server/server.py
+```
+
+Place 64x64 PNG skins in `example-server/skins/` named as `<nickname>.png` (e.g., `Notch.png`).
+The server will serve both the JSON endpoint and the skin files.
+
+Configure the mod to use:
+```
+general {
+    S:apiUrl=http://your-ip:8000/%s
+}
+```
+
 ## Build
 
 ```
